@@ -313,12 +313,15 @@ const CLUJ_CENTER = [46.7712, 23.6236];
 let apiKey = 'PyzKfV3MncBFqRrN8cQQ0LdMpvPG2EepYPtoewPE';
 let vehicles = [];
 let routes   = {};
+let trips    = {};
 let markers  = {};
 let selectedId = null;
 let refreshTimer = null;
 let countdownTimer = null;
 let countdownVal = 0;
 let filterText = '';
+let shapesCache = null;
+let routeLines  = [];
 
 const map = L.map('map', { zoomControl: true, attributionControl: true }).setView(CLUJ_CENTER, 13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -372,11 +375,54 @@ async function fetchRoutes() {
   for (const r of data) routes[r.route_id] = r;
 }
 
+async function fetchTrips() {
+  const data = await apiGet('trips');
+  trips = {};
+  for (const t of data) {
+    if (!trips[t.route_id]) trips[t.route_id] = [];
+    if (!trips[t.route_id].includes(t.shape_id)) trips[t.route_id].push(t.shape_id);
+  }
+}
+
+async function loadShapes() {
+  if (shapesCache) return shapesCache;
+  const data = await apiGet('shapes');
+  shapesCache = {};
+  for (const s of data) {
+    if (!shapesCache[s.shape_id]) shapesCache[s.shape_id] = [];
+    shapesCache[s.shape_id].push(s);
+  }
+  for (const id of Object.keys(shapesCache))
+    shapesCache[id].sort((a, b) => a.shape_pt_sequence - b.shape_pt_sequence);
+  return shapesCache;
+}
+
+function clearRouteLines() {
+  for (const l of routeLines) map.removeLayer(l);
+  routeLines = [];
+}
+
+async function drawRoute(routeId, color) {
+  clearRouteLines();
+  const shapeIds = trips[routeId] || [];
+  if (!shapeIds.length) return;
+  const shapes = await loadShapes();
+  shapeIds.forEach((sid, i) => {
+    const pts = shapes[sid];
+    if (!pts) return;
+    const line = L.polyline(pts.map(p => [p.shape_pt_lat, p.shape_pt_lon]), {
+      color, weight: 5, opacity: i === 0 ? 0.85 : 0.5, smoothFactor: 1
+    }).addTo(map);
+    routeLines.push(line);
+  });
+}
+
 async function connect() {
   setStatus('connecting', 'connecting…');
   hideError();
   try {
     await fetchRoutes();
+    await fetchTrips();
     await refresh();
     startAutoRefresh();
   } catch(e) {
@@ -524,11 +570,19 @@ function updateList() {
 }
 
 function selectBus(id) {
+  // Tap same bus again → deselect and clear route
+  if (selectedId === id) {
+    selectedId = null;
+    clearRouteLines();
+    updateList();
+    return;
+  }
   selectedId = id;
   const m = markers[id]; if (!m) return;
   const v = m._vdata; const routeName = m._routeName; const color = routeColor(routeName);
   map.flyTo([v.latitude, v.longitude], 16, { duration: 0.8 });
   m.bindPopup(makePopupHtml(v, routeName, color), { maxWidth: 220 }).openPopup();
+  drawRoute(v.route_id, color);
   updateList();
 }
 
