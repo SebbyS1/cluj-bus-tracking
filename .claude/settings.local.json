@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"from PIL import Image, ImageDraw, ImageFont; print\\(''PIL available''\\)\")",
+      "Bash(python3 -c \":*)",
+      "mcp__Claude_Preview__preview_start"
+    ]
+  }
+}

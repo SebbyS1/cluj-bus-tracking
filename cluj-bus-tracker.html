@@ -244,7 +244,7 @@
 <header>
   <div class="logo">
     <div class="logo-icon">🚌</div>
-    <div class="logo-text">Cluj <span>Bus</span></div>
+    <div class="logo-text">Cluj-<span>Napoca</span></div>
   </div>
   <div class="bus-count" id="busCountBadge">— buses</div>
   <div class="status-pill">
@@ -256,19 +256,7 @@
 <div class="app-body">
   <div class="sidebar">
 
-    <div class="sidebar-section">
-      <div class="sidebar-label">Tranzy API Key</div>
-      <div class="api-form">
-        <div class="api-input-wrap">
-          <input type="text" id="apiKeyInput" placeholder="Paste your API key…" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"/>
-          <button class="btn" id="connectBtn" onclick="connect()">Connect</button>
-        </div>
-        <div class="error-banner" id="errorBanner"></div>
-        <div class="api-hint">
-          Free key at <a href="https://tranzy.dev/accounts/my-apps" target="_blank">tranzy.dev/accounts/my-apps</a> — sign up, create an app, select <strong>CTP Cluj-Napoca</strong>.
-        </div>
-      </div>
-    </div>
+    <div class="error-banner" id="errorBanner" style="margin:10px 14px;display:none"></div>
 
     <div class="sidebar-section">
       <div class="sidebar-label">Filter by route</div>
@@ -301,7 +289,7 @@ const API_BASE  = 'https://api.tranzy.ai/v1/opendata/';
 const REFRESH_INTERVAL = 20000;
 const CLUJ_CENTER = [46.7712, 23.6236];
 
-let apiKey = localStorage.getItem('tranzy_api_key') || '';
+let apiKey = 'PyzKfV3MncBFqRrN8cQQ0LdMpvPG2EepYPtoewPE';
 let vehicles = [];
 let routes   = {};
 let markers  = {};
@@ -364,12 +352,6 @@ async function fetchRoutes() {
 }
 
 async function connect() {
-  const input = document.getElementById('apiKeyInput').value.trim();
-  if (!input) return;
-  apiKey = input;
-  localStorage.setItem('tranzy_api_key', apiKey);
-  const btn = document.getElementById('connectBtn');
-  btn.disabled = true; btn.textContent = '…';
   setStatus('connecting', 'connecting…');
   hideError();
   try {
@@ -379,8 +361,6 @@ async function connect() {
   } catch(e) {
     showError(e.message.includes('401') ? 'Invalid API key.' : e.message);
     setStatus('error', 'error');
-  } finally {
-    btn.disabled = false; btn.textContent = 'Connect';
   }
 }
 
@@ -530,7 +510,7 @@ function showError(msg) {
 }
 function hideError() { document.getElementById('errorBanner').style.display = 'none'; }
 
-if (apiKey) { document.getElementById('apiKeyInput').value = apiKey; connect(); }
+connect();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
