@@ -419,8 +419,6 @@ async function drawRoute(routeId, color) {
   });
 }
 
-let animationStarted = false;
-
 async function connect() {
   setStatus('connecting', 'connecting…');
   hideError();
@@ -429,7 +427,7 @@ async function connect() {
     await fetchTrips();
     await refresh();
     startAutoRefresh();
-    if (!animationStarted) { animationStarted = true; animateVehicles(); }
+    requestAnimationFrame(animateVehicles);
   } catch(e) {
     showError(e.message.includes('401') ? 'Invalid API key.' : e.message);
     setStatus('error', 'error');
@@ -546,7 +544,7 @@ function updateMap() {
   document.getElementById('busCountBadge').innerHTML = `<strong>${fv.length}</strong> buses`;
 }
 
-// Smooth animation loop — runs every 100ms, interpolates bus positions
+// Smooth animation loop — runs at 60fps via requestAnimationFrame
 function animateVehicles() {
   const now = Date.now();
   for (const [id, state] of Object.entries(vehicleStates)) {
@@ -560,7 +558,7 @@ function animateVehicles() {
     state.currentLng = lng;
     m.setLatLng([lat, lng]);
   }
-  setTimeout(animateVehicles, 100);
+  requestAnimationFrame(animateVehicles);
 }
 
 function makePopupHtml(v, routeName, color) {
