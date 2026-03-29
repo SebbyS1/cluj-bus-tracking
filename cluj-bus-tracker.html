@@ -384,8 +384,9 @@ async function fetchTrips() {
   const data = await apiGet('trips');
   trips = {};
   for (const t of data) {
-    if (!trips[t.route_id]) trips[t.route_id] = [];
-    if (!trips[t.route_id].includes(t.shape_id)) trips[t.route_id].push(t.shape_id);
+    if (!trips[t.route_id]) trips[t.route_id] = { shapeIds: [], tripIds: [] };
+    if (!trips[t.route_id].shapeIds.includes(t.shape_id)) trips[t.route_id].shapeIds.push(t.shape_id);
+    if (!trips[t.route_id].tripIds.includes(t.trip_id)) trips[t.route_id].tripIds.push(t.trip_id);
   }
 }
 
@@ -414,11 +415,7 @@ function clearStopMarkers() {
 
 function showStopsForRoute(routeId, color) {
   clearStopMarkers();
-  // Get all trip_ids for this route from trips data
-  const tripIds = Object.keys(stopTimes).filter(tid => {
-    // match trip_id prefix to route (trip_id format is "routeId_direction")
-    return tid.startsWith(routeId + '_');
-  });
+  const tripIds = trips[routeId]?.tripIds || [];
   const seenStops = new Set();
   for (const tid of tripIds) {
     const times = stopTimes[tid] || [];
@@ -460,7 +457,7 @@ function clearRouteLines() {
 
 async function drawRoute(routeId, color) {
   clearRouteLines();
-  const shapeIds = trips[routeId] || [];
+  const shapeIds = trips[routeId]?.shapeIds || [];
   if (!shapeIds.length) return;
   const shapes = await loadShapes();
   shapeIds.forEach((sid, i) => {
