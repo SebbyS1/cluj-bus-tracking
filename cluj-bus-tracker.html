@@ -203,14 +203,23 @@
   .locate-btn:active { opacity: 0.7; }
   .locate-btn.active { border-color: #4285f4; }
   .leaflet-tile-pane { filter: brightness(0.7) saturate(0.6) hue-rotate(200deg); }
-  .leaflet-popup-content-wrapper {
-    background: var(--surface2) !important; border: 1px solid var(--border) !important;
-    border-radius: 10px !important; color: var(--text) !important;
-    box-shadow: 0 8px 32px rgba(0,0,0,.6) !important; font-family: var(--sans) !important;
+  /* bus info tooltip — non-blocking */
+  .bus-tooltip {
+    background: var(--surface2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+    color: var(--text) !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,.6) !important;
+    font-family: var(--sans) !important;
+    padding: 10px 14px !important;
+    pointer-events: none !important;
   }
-  .leaflet-popup-tip { background: var(--surface2) !important; }
-  .leaflet-popup-close-button { color: var(--text-dim) !important; font-size: 18px !important; padding: 8px !important; }
-  .popup-route { font-weight: 800; font-size: 18px; color: var(--accent); margin-bottom: 4px; }
+  .bus-tooltip::before { display: none !important; }
+  .leaflet-tooltip-top.bus-tooltip::before {
+    display: block !important;
+    border-top-color: var(--border) !important;
+  }
+  .popup-route { font-weight: 800; font-size: 18px; margin-bottom: 4px; }
   .popup-label { font-size: 12px; color: var(--text); margin-bottom: 6px; }
   .popup-meta { font-family: var(--mono); font-size: 10px; color: var(--text-dim); line-height: 1.8; }
   .popup-meta span { color: var(--green); }
@@ -593,8 +602,8 @@ function updateMap() {
         .addTo(map).on('click', () => selectBus(id));
       m._routeName = routeName; m._vdata = v; markers[id] = m;
     }
-    if (markers[id].isPopupOpen())
-      markers[id].setPopupContent(makePopupHtml(v, routeName, color));
+    if (id == selectedId && markers[id].getTooltip())
+      markers[id].setTooltipContent(makePopupHtml(v, routeName, color));
   }
   for (const id of Object.keys(markers)) {
     if (!seen.has(String(id))) {
@@ -666,20 +675,35 @@ function updateList() {
   }).join('');
 }
 
+function clearBusTooltip() {
+  for (const m of Object.values(markers)) {
+    if (m.getTooltip()) m.unbindTooltip();
+  }
+}
+
 function selectBus(id) {
-  // Tap same bus again → deselect and clear route + stops
+  // Tap same bus again → deselect
   if (selectedId === id) {
     selectedId = null;
     clearRouteLines();
     clearStopMarkers();
+    clearBusTooltip();
     updateList();
     return;
   }
+  // Clear previous tooltip
+  clearBusTooltip();
   selectedId = id;
   const m = markers[id]; if (!m) return;
   const v = m._vdata; const routeName = m._routeName; const color = routeColor(routeName);
   map.flyTo([v.latitude, v.longitude], 16, { duration: 0.8 });
-  m.bindPopup(makePopupHtml(v, routeName, color), { maxWidth: 220 }).openPopup();
+  m.bindTooltip(makePopupHtml(v, routeName, color), {
+    permanent: true,
+    interactive: false,
+    direction: 'top',
+    className: 'bus-tooltip',
+    offset: [0, -52]
+  }).openTooltip();
   drawRoute(v.route_id, color);
   showStopsForRoute(v.route_id, color);
   updateList();
