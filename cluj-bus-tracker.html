@@ -492,11 +492,18 @@ function isInDepot(lat, lng) {
 }
 
 function filteredVehicles() {
-  let result = vehicles.filter(v => !isInDepot(v.latitude, v.longitude));
+  let result = vehicles.filter(v => {
+    if (!v.latitude || !v.longitude) return false; // no coordinates
+    if (isInDepot(v.latitude, v.longitude)) return false; // in depot
+    const r = routes[v.route_id];
+    const name = r ? (r.route_short_name || r.route_long_name || '') : '';
+    if (!name) return false; // no route name
+    return true;
+  });
   if (!filterText) return result;
   return result.filter(v => {
     const r = routes[v.route_id];
-    const label = r ? (r.route_short_name || r.route_long_name || '') : String(v.route_id);
+    const label = r ? (r.route_short_name || r.route_long_name || '') : '';
     return label.toLowerCase().includes(filterText.toLowerCase());
   });
 }
