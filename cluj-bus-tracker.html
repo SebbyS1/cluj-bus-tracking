@@ -294,7 +294,7 @@
     <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
     <div class="update-bar">
       <span id="lastUpdate">—</span>
-      <span>Next <span class="countdown" id="countdown">—</span></span>
+      <span>GPS <span class="countdown" id="countdown">—</span></span>
     </div>
   </div>
 
@@ -323,6 +323,7 @@ let filterText = '';
 let shapesCache = null;
 let routeLines  = [];
 let vehicleStates = {}; // interpolation state per vehicle
+let lastGpsTimestamp = null; // most recent GPS timestamp from vehicles
 
 const map = L.map('map', { zoomControl: true, attributionControl: true }).setView(CLUJ_CENTER, 13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -438,9 +439,17 @@ async function connect() {
 async function refresh() {
   try {
     vehicles = await apiGet('vehicles');
+    // Find the most recent GPS timestamp across all vehicles
+    for (const v of vehicles) {
+      if (v.timestamp) {
+        const t = new Date(v.timestamp).getTime();
+        if (!lastGpsTimestamp || t > lastGpsTimestamp) lastGpsTimestamp = t;
+      }
+    }
     updateMap(); updateList();
     setStatus('live', 'live');
     document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+    updateGpsAge();
     hideError();
   } catch(e) {
     showError(e.message); setStatus('error', 'error');
@@ -450,22 +459,22 @@ async function refresh() {
 function startAutoRefresh() {
   clearInterval(refreshTimer); clearInterval(countdownTimer);
   refreshTimer = setInterval(refresh, REFRESH_INTERVAL);
-  startCountdown();
+  startGpsAgeTimer();
 }
 
-function startCountdown() {
-  countdownVal = REFRESH_INTERVAL / 1000;
+function startGpsAgeTimer() {
   clearInterval(countdownTimer);
-  updateCountdown();
-  countdownTimer = setInterval(() => {
-    if (--countdownVal < 0) countdownVal = REFRESH_INTERVAL / 1000;
-    updateCountdown();
-  }, 1000);
+  countdownTimer = setInterval(updateGpsAge, 1000);
 }
 
-function updateCountdown() {
-  document.getElementById('countdown').textContent = countdownVal + 's';
-  const pct = ((REFRESH_INTERVAL / 1000 - countdownVal) / (REFRESH_INTERVAL / 1000)) * 100;
+function updateGpsAge() {
+  if (!lastGpsTimestamp) return;
+  const ageMs = Date.now() - lastGpsTimestamp;
+  const ageSec = Math.round(ageMs / 1000);
+  const txt = ageSec < 60 ? `${ageSec}s ago` : `${Math.floor(ageSec/60)}m ${ageSec%60}s ago`;
+  document.getElementById('countdown').textContent = txt;
+  // progress bar fills as data gets older (resets at 20s)
+  const pct = Math.min((ageSec / 20) * 100, 100);
   document.getElementById('progressFill').style.width = pct + '%';
 }
 
