@@ -322,6 +322,7 @@ let countdownVal = 0;
 let filterText = '';
 let shapesCache = null;
 let routeLines  = [];
+let vehicleStates = {}; // interpolation state per vehicle
 
 const map = L.map('map', { zoomControl: true, attributionControl: true }).setView(CLUJ_CENTER, 13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -417,6 +418,8 @@ async function drawRoute(routeId, color) {
   });
 }
 
+let animationStarted = false;
+
 async function connect() {
   setStatus('connecting', 'connecting…');
   hideError();
@@ -425,6 +428,7 @@ async function connect() {
     await fetchTrips();
     await refresh();
     startAutoRefresh();
+    if (!animationStarted) { animationStarted = true; animateVehicles(); }
   } catch(e) {
     showError(e.message.includes('401') ? 'Invalid API key.' : e.message);
     setStatus('error', 'error');
@@ -499,6 +503,7 @@ function filteredVehicles() {
 function updateMap() {
   const fv = filteredVehicles();
   const seen = new Set();
+  const now = Date.now();
   for (const v of fv) {
     if (!v.latitude || !v.longitude) continue;
     const id = v.id; seen.add(String(id));
@@ -506,8 +511,20 @@ function updateMap() {
     const routeName = r ? (r.route_short_name || r.route_long_name || '?') : String(v.route_id || '?');
     const color = routeColor(routeName);
     const icon = makeBusIcon(routeName, color, v.bearing || 0);
+
+    // Set up interpolation state
+    const prev = vehicleStates[id];
+    vehicleStates[id] = {
+      fromLat: prev ? prev.currentLat : v.latitude,
+      fromLng: prev ? prev.currentLng : v.longitude,
+      toLat: v.latitude,
+      toLng: v.longitude,
+      currentLat: prev ? prev.currentLat : v.latitude,
+      currentLng: prev ? prev.currentLng : v.longitude,
+      updateTime: now
+    };
+
     if (markers[id]) {
-      markers[id].setLatLng([v.latitude, v.longitude]);
       markers[id].setIcon(icon);
       markers[id]._routeName = routeName; markers[id]._vdata = v;
     } else {
@@ -519,9 +536,27 @@ function updateMap() {
       markers[id].setPopupContent(makePopupHtml(v, routeName, color));
   }
   for (const id of Object.keys(markers)) {
-    if (!seen.has(String(id))) { map.removeLayer(markers[id]); delete markers[id]; }
+    if (!seen.has(String(id))) {
+      map.removeLayer(markers[id]); delete markers[id]; delete vehicleStates[id];
+    }
   }
   document.getElementById('busCountBadge').innerHTML = `<strong>${fv.length}</strong> buses`;
+}
+
+// Smooth animation loop — runs every 100ms, interpolates bus positions
+function animateVehicles() {
+  const now = Date.now();
+  for (const [id, state] of Object.entries(vehicleStates)) {
+    const m = markers[id];
+    if (!m) continue;
+    const t = Math.min((now - state.updateTime) / REFRESH_INTERVAL, 1);
+    const lat = state.fromLat + (state.toLat - state.fromLat) * t;
+    const lng = state.fromLng + (state.toLng - state.fromLng) * t;
+    state.currentLat = lat;
+    state.currentLng = lng;
+    m.setLatLng([lat, lng]);
+  }
+  setTimeout(animateVehicles, 100);
 }
 
 function makePopupHtml(v, routeName, color) {
