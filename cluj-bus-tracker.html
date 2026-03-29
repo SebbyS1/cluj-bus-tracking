@@ -439,13 +439,7 @@ async function connect() {
 async function refresh() {
   try {
     vehicles = await apiGet('vehicles');
-    // Find the most recent GPS timestamp across all vehicles
-    for (const v of vehicles) {
-      if (v.timestamp) {
-        const t = new Date(v.timestamp).getTime();
-        if (!lastGpsTimestamp || t > lastGpsTimestamp) lastGpsTimestamp = t;
-      }
-    }
+    lastGpsTimestamp = Date.now();
     updateMap(); updateList();
     setStatus('live', 'live');
     document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
