@@ -552,7 +552,8 @@ function animateVehicles() {
   for (const [id, state] of Object.entries(vehicleStates)) {
     const m = markers[id];
     if (!m) continue;
-    const t = Math.min((now - state.updateTime) / 2000, 1);
+    const raw = Math.min((now - state.updateTime) / 6000, 1);
+    const t = 1 - Math.pow(1 - raw, 3); // cubic ease-out
     const lat = state.fromLat + (state.toLat - state.fromLat) * t;
     const lng = state.fromLng + (state.toLng - state.fromLng) * t;
     state.currentLat = lat;
