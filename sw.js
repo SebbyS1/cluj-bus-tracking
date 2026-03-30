@@ -1,4 +1,4 @@
-const CACHE = 'cluj-bus-v2';
+const CACHE = 'cluj-bus-v3';
 const ASSETS = [
   './cluj-bus-tracker.html',
   './manifest.json',
